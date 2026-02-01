@@ -6,8 +6,7 @@ import {
   UploadProgress,
   DEFAULT_CHUNK_SIZE,
 } from "./types";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import { getApiBaseUrl } from "../api-client";
 
 export interface ChunkedUploaderOptions {
   file: File;
@@ -53,7 +52,7 @@ export class ChunkedUploader {
     this.onComplete = options.onComplete;
     this.onError = options.onError;
     this.getAuthHeaders = options.getAuthHeaders;
-    this.apiBaseUrl = options.apiBaseUrl || `${API_BASE_URL}/api`;
+    this.apiBaseUrl = options.apiBaseUrl || `${getApiBaseUrl()}/api`;
   }
 
   async start(): Promise<void> {

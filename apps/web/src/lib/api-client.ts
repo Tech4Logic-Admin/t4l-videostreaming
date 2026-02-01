@@ -296,7 +296,29 @@ export class ApiClientError extends Error {
   }
 }
 
-let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
+const ENV_API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+/**
+ * Returns an absolute base URL for API requests. Paths are always /api/... so base must be
+ * the origin (e.g. http://13.68.145.89) when NEXT_PUBLIC_API_URL is /api, to avoid double /api/api.
+ * Also ensures new URL(path, base) never receives a relative base (which throws).
+ */
+export function getApiBaseUrl(): string {
+  const raw = ENV_API_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000';
+  }
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('/')) {
+    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000';
+  }
+  try {
+    new URL(trimmed);
+    return trimmed;
+  } catch {
+    return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000';
+  }
+}
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
@@ -340,20 +362,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
-  let base = API_BASE_URL;
-  // Fallback to current origin if an invalid base sneaks in from env
-  try {
-    // test construct
-    // eslint-disable-next-line no-new
-    new URL(base);
-  } catch {
-    if (typeof window !== 'undefined') {
-      base = window.location.origin;
-    } else {
-      base = 'http://localhost:5000';
-    }
-  }
-
+  const base = getApiBaseUrl();
   const url = new URL(path, base);
 
   if (params) {
@@ -514,7 +523,7 @@ export const searchApi = {
         id: result.videoId,
         title: result.videoTitle,
         description: matches.length ? matches.slice(0, 2).map((m) => m.text).join(' … ') : undefined,
-        thumbnailUrl: `${API_BASE_URL}/api/stream/${result.videoId}/thumbnail`,
+        thumbnailUrl: `${getApiBaseUrl()}/api/stream/${result.videoId}/thumbnail`,
         duration: result.durationMs ? Math.round(result.durationMs / 1000) : undefined,
         highlights: highlight ? [highlight] : undefined,
         matches,

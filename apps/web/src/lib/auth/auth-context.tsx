@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, AuthState, DevUser } from './types';
+import { getApiBaseUrl } from '../api-client';
 
 interface AuthContextType extends AuthState {
   login: (userId?: string, role?: string) => Promise<void>;
@@ -12,8 +13,6 @@ interface AuthContextType extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // Store dev auth headers in localStorage
 const DEV_USER_KEY = 'dev-user-id';
@@ -47,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch current user from API
   const fetchCurrentUser = useCallback(async (): Promise<User | null> => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/me`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/me`, {
         headers: {
           'Content-Type': 'application/json',
           ...getDevHeaders(),
@@ -72,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch available dev users
   const fetchDevUsers = useCallback(async () => {
     try {
-      const response = await fetch(`${API_URL}/api/auth/dev-users`);
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/dev-users`);
       if (response.ok) {
         const users = await response.json();
         setDevUsers(users);
