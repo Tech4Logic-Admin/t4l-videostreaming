@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [devUsers, setDevUsers] = useState<DevUser[]>([]);
   const [isDevMode, setIsDevMode] = useState(false);
+  const [devDefaultSet, setDevDefaultSet] = useState(false);
 
   // Get stored dev credentials
   const getDevHeaders = useCallback((): Record<string, string> => {
@@ -88,6 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       await fetchDevUsers();
+      // If dev mode and no stored dev user, default to admin for demo convenience
+      if (!devDefaultSet && isDevMode && typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem(DEV_USER_KEY);
+        if (!storedUser && devUsers.length > 0) {
+          const adminUser = devUsers.find((u) => u.role?.toLowerCase() === 'admin') ?? devUsers[0];
+          localStorage.setItem(DEV_USER_KEY, adminUser.id);
+          localStorage.setItem(DEV_ROLE_KEY, adminUser.role);
+          setDevDefaultSet(true);
+        }
+      }
+
       const user = await fetchCurrentUser();
       setState({
         user,
@@ -97,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     };
     init();
-  }, [fetchCurrentUser, fetchDevUsers]);
+  }, [fetchCurrentUser, fetchDevUsers, isDevMode, devUsers, devDefaultSet]);
 
   // Login (for dev mode)
   const login = useCallback(async (userId?: string, role?: string) => {

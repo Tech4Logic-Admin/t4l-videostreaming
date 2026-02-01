@@ -1,0 +1,14 @@
+# Tech4Logic Video Search - Demo reverse proxy (port 80)
+# Serves web on / and API on /api so only port 80 need be opened.
+
+:80 {
+  # API: strip /api prefix and forward to api:8080
+  handle /api/* {
+    uri strip_prefix /api
+    reverse_proxy api:8080
+  }
+  # Web app
+  handle {
+    reverse_proxy web:3000
+  }
+}

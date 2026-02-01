@@ -4,6 +4,95 @@ This document recommends the **lowest-cost way to host Tech4Logic Video Search o
 
 ---
 
+## Single VM Demo (Cheapest POC) — Recommended for Demo
+
+The **cheapest** way to run the full stack for a demo is a **single Ubuntu VM (B2s)** with Docker Compose. All resources are tagged for cost tracking.
+
+### 1. Create the VM (from your Windows machine with Azure CLI)
+
+```powershell
+cd scripts\azure-vm-demo
+.\deploy-vm.ps1
+```
+
+Or run manually with tags:
+
+```bash
+# Resource group (with meaningful tags)
+az group create -n t4l-demo-rg -l eastus --tags project=t4l-videosearch environment=demo purpose=video-search-poc-demo application=t4l-videostreaming managedBy=script workload=docker-compose role=demo-server
+
+# VM (B2s, Ubuntu 22.04; use Standard public IP if Basic quota is 0)
+az vm create -g t4l-demo-rg -n t4l-demo-vm --image Ubuntu2204 --size Standard_B2s --public-ip-sku Standard --admin-username t4ldemo --generate-ssh-keys --tags project=t4l-videosearch environment=demo purpose=video-search-poc-demo application=t4l-videostreaming managedBy=script workload=docker-compose role=demo-server
+
+# Open ports (80=web via Caddy, 443=HTTPS, 3000/5000 optional)
+az vm open-port -g t4l-demo-rg -n t4l-demo-vm --port 80   --priority 1001
+az vm open-port -g t4l-demo-rg -n t4l-demo-vm --port 443  --priority 1002
+az vm open-port -g t4l-demo-rg -n t4l-demo-vm --port 3000 --priority 1003
+az vm open-port -g t4l-demo-rg -n t4l-demo-vm --port 5000 --priority 1004
+```
+
+Note the **public IP** from the VM create output.
+
+### 2. SSH into the VM
+
+```bash
+ssh t4ldemo@<public-ip>
+```
+
+### 3. Install Docker and Docker Compose plugin
+
+```bash
+sudo apt update
+sudo apt install -y docker.io docker-compose-plugin
+sudo usermod -aG docker $USER
+newgrp docker   # refresh group (or log out and back in)
+```
+
+### 4. Get the project onto the VM
+
+- **Option A (clone — recommended):** Fast and simple; no large folders to copy.
+  ```bash
+  git clone <your-repo-url> ~/t4l-videostreaming
+  cd ~/t4l-videostreaming
+  ```
+- **Option B (SCP from your machine):** Use if you have local changes and no push yet.
+  ```bash
+  # On your Windows machine (PowerShell or Git Bash):
+  scp -r C:\Users\SiddharthaSingh\Documents\workspace\t4l-videostreaming t4ldemo@<public-ip>:~/t4l-videostreaming
+  # Then on VM:
+  cd ~/t4l-videostreaming
+  ```
+
+### 5. Start the stack (with Caddy on port 80)
+
+From the repo root on the VM, set the VM’s public IP for CORS (so the browser can call the API), then start:
+
+```bash
+export CORS_ORIGIN=http://<public-ip>   # use the VM’s public IP
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
+```
+
+This starts Postgres, Azurite, API, Web, and **Caddy** so the app is served on **port 80** (web at `/`, API at `/api`).
+
+### 6. Verify
+
+- **API health:** `curl http://localhost/api/healthz`
+- **Web:** Open `http://<public-ip>/` in a browser.
+
+### 7. Resource hygiene (save cost)
+
+- **Stop VM when not in use:** `az vm stop -g t4l-demo-rg -n t4l-demo-vm`
+- **Start when needed:** `az vm start -g t4l-demo-rg -n t4l-demo-vm`
+- **Delete when done:** `az group delete -n t4l-demo-rg --yes --no-wait`
+
+### 8. Troubleshooting
+
+- **Logs:** `docker compose -f docker-compose.yml -f docker-compose.demo.yml logs -f web` (or `api`)
+- **Clean rebuild:** `docker compose -f docker-compose.yml -f docker-compose.demo.yml down -v && docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build`
+- **Firewall on VM:** `sudo ufw status` — allow 80/443/3000/5000 if enabled.
+
+---
+
 ## Application Summary
 
 | Component | Tech | Current Azure Target |

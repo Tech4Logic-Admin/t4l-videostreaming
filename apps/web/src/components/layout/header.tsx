@@ -28,9 +28,11 @@ export function Header() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center space-x-2">
-          <div className="h-10 w-10 bg-t4l-primary rounded flex items-center justify-center">
-            <span className="text-white font-bold text-lg">T4</span>
-          </div>
+          <img
+            src="/logo-tech4logic.svg"
+            alt="Tech4Logic"
+            className="h-10 w-auto object-contain"
+          />
           <span className="font-semibold text-t4l-dark hidden sm:inline-block">
             Video Search
           </span>

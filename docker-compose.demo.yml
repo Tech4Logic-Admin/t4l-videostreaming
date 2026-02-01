@@ -1,0 +1,34 @@
+# Override for VM demo: Caddy on port 80, web built with API at /api
+# Usage: docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+# On VM, set CORS_ORIGIN=http://<your-vm-public-ip> so browser requests are allowed.
+
+services:
+  api:
+    environment:
+      Cors__AllowedOrigins: ${CORS_ORIGIN:-http://localhost:3000}
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api
+    environment:
+      - NODE_ENV=production
+      - API_URL=http://api:8080
+      - NEXT_PUBLIC_API_URL=/api
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: t4l-caddy
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile.demo:/etc/caddy/Caddyfile:ro
+    depends_on:
+      web:
+        condition: service_started
+      api:
+        condition: service_healthy
+    networks:
+      - t4l-network
