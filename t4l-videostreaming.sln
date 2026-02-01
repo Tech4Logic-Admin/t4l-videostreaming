@@ -1,0 +1,42 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "apps", "apps", "{1787FE1D-075E-9E68-7218-25F1BD1BBEAB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "api", "api", "{BC2D172B-13BC-136C-CDB1-4B1A687208C4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "T4L.VideoSearch.Api", "apps\api\T4L.VideoSearch.Api.csproj", "{1B5C58DD-F59F-E295-EB5D-BFB962503AE6}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "worker", "worker", "{82AC7ADD-723F-E433-2729-6F05EB21E721}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "T4L.VideoSearch.Worker", "apps\worker\T4L.VideoSearch.Worker.csproj", "{409FD457-40EC-6FBF-147B-987406D9976E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1B5C58DD-F59F-E295-EB5D-BFB962503AE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B5C58DD-F59F-E295-EB5D-BFB962503AE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B5C58DD-F59F-E295-EB5D-BFB962503AE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B5C58DD-F59F-E295-EB5D-BFB962503AE6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{409FD457-40EC-6FBF-147B-987406D9976E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{409FD457-40EC-6FBF-147B-987406D9976E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{409FD457-40EC-6FBF-147B-987406D9976E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{409FD457-40EC-6FBF-147B-987406D9976E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{BC2D172B-13BC-136C-CDB1-4B1A687208C4} = {1787FE1D-075E-9E68-7218-25F1BD1BBEAB}
+		{1B5C58DD-F59F-E295-EB5D-BFB962503AE6} = {BC2D172B-13BC-136C-CDB1-4B1A687208C4}
+		{82AC7ADD-723F-E433-2729-6F05EB21E721} = {1787FE1D-075E-9E68-7218-25F1BD1BBEAB}
+		{409FD457-40EC-6FBF-147B-987406D9976E} = {82AC7ADD-723F-E433-2729-6F05EB21E721}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5627C37E-ECAD-4BC2-AEFE-F3C0A98D150E}
+	EndGlobalSection
+EndGlobal

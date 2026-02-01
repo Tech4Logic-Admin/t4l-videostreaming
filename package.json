@@ -1,0 +1,28 @@
+{
+  "name": "t4l-video-search",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tech4Logic Video Search - RBAC + Multilingual Timeline Search",
+  "author": "Tech4Logic",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @t4l/web dev",
+    "build": "pnpm --filter @t4l/web build",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
+    "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @t4l/e2e test",
+    "clean": "pnpm -r clean && rimraf node_modules"
+  },
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.4.2"
+  }
+}

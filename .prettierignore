@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+out
+coverage
+bin
+obj
+azurite-data
+pgdata
+*.log

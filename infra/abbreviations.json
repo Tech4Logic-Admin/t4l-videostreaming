@@ -1,0 +1,14 @@
+{
+  "resourcesResourceGroups": "rg-",
+  "containerAppsEnvironments": "cae-",
+  "containerApps": "ca-",
+  "containerRegistries": "cr",
+  "keyVaults": "kv-",
+  "storageAccounts": "st",
+  "databasePostgresql": "psql-",
+  "logAnalyticsWorkspaces": "log-",
+  "appInsights": "appi-",
+  "virtualNetworks": "vnet-",
+  "networkSecurityGroups": "nsg-",
+  "privateDnsZones": "pdnsz-"
+}

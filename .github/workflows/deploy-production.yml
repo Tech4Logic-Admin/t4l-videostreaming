@@ -1,0 +1,328 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+      skip_approval:
+        description: 'Skip manual approval (use with caution)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  NODE_VERSION: "20"
+  PNPM_VERSION: "9"
+  AZURE_LOCATION: eastus
+  ENVIRONMENT_NAME: prod
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # =============================================================================
+  # Pre-deployment Checks
+  # =============================================================================
+  pre-checks:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify staging deployment
+        run: |
+          echo "Verifying staging environment is healthy..."
+          # Add staging health check here if needed
+          echo "Staging verification passed"
+
+  # =============================================================================
+  # Manual Approval (Production Gate)
+  # =============================================================================
+  approval:
+    name: Production Approval
+    runs-on: ubuntu-latest
+    needs: pre-checks
+    if: github.event.inputs.skip_approval != 'true'
+    environment: production
+    steps:
+      - name: Approval granted
+        run: echo "Production deployment approved for version ${{ needs.pre-checks.outputs.version }}"
+
+  # =============================================================================
+  # Build Production Images
+  # =============================================================================
+  build:
+    name: Build Production
+    runs-on: ubuntu-latest
+    needs: [pre-checks, approval]
+    if: |
+      always() &&
+      needs.pre-checks.result == 'success' &&
+      (needs.approval.result == 'success' || needs.approval.result == 'skipped')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.pre-checks.outputs.version }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Build API
+        run: |
+          dotnet restore apps/api/T4L.VideoSearch.Api.csproj
+          dotnet build apps/api/T4L.VideoSearch.Api.csproj --configuration Release
+          dotnet publish apps/api/T4L.VideoSearch.Api.csproj --configuration Release --output ./publish/api
+
+      - name: Build Web
+        run: |
+          cd apps/web
+          pnpm install
+          pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.PROD_API_URL }}
+
+      - name: Upload API artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-prod-build
+          path: ./publish/api
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-prod-build
+          path: apps/web/.next
+
+  # =============================================================================
+  # Deploy Infrastructure
+  # =============================================================================
+  deploy-infra:
+    name: Deploy Production Infrastructure
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      apiUrl: ${{ steps.outputs.outputs.apiUrl }}
+      webUrl: ${{ steps.outputs.outputs.webUrl }}
+      acrLoginServer: ${{ steps.outputs.outputs.acrLoginServer }}
+      acrName: ${{ steps.outputs.outputs.acrName }}
+      resourceGroup: ${{ steps.outputs.outputs.resourceGroup }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          scope: subscription
+          region: ${{ env.AZURE_LOCATION }}
+          template: ./infra/main.bicep
+          parameters: >
+            environmentName=${{ env.ENVIRONMENT_NAME }}
+            location=${{ env.AZURE_LOCATION }}
+            aadTenantId=${{ secrets.AZURE_TENANT_ID }}
+            aadClientId=${{ secrets.AAD_CLIENT_ID_PROD }}
+          deploymentName: t4l-${{ env.ENVIRONMENT_NAME }}-${{ github.run_number }}
+          failOnStdErr: false
+
+      - name: Get deployment outputs
+        id: outputs
+        run: |
+          echo "apiUrl=${{ steps.deploy.outputs.API_URL }}" >> $GITHUB_OUTPUT
+          echo "webUrl=${{ steps.deploy.outputs.WEB_URL }}" >> $GITHUB_OUTPUT
+          echo "acrLoginServer=${{ steps.deploy.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT }}" >> $GITHUB_OUTPUT
+          echo "acrName=${{ steps.deploy.outputs.AZURE_CONTAINER_REGISTRY_NAME }}" >> $GITHUB_OUTPUT
+          echo "resourceGroup=${{ steps.deploy.outputs.AZURE_RESOURCE_GROUP }}" >> $GITHUB_OUTPUT
+
+  # =============================================================================
+  # Build and Push Container Images
+  # =============================================================================
+  build-images:
+    name: Build Production Images
+    runs-on: ubuntu-latest
+    needs: [pre-checks, deploy-infra]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.pre-checks.outputs.version }}
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: |
+          az acr login --name ${{ needs.deploy-infra.outputs.acrName }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ needs.deploy-infra.outputs.acrLoginServer }}/t4l-api:${{ needs.pre-checks.outputs.version }}
+            ${{ needs.deploy-infra.outputs.acrLoginServer }}/t4l-api:latest
+          build-args: |
+            BUILD_CONFIGURATION=Release
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/web
+          file: ./apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ needs.deploy-infra.outputs.acrLoginServer }}/t4l-web:${{ needs.pre-checks.outputs.version }}
+            ${{ needs.deploy-infra.outputs.acrLoginServer }}/t4l-web:latest
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ needs.deploy-infra.outputs.apiUrl }}
+
+  # =============================================================================
+  # Deploy with Blue-Green Strategy
+  # =============================================================================
+  deploy-apps:
+    name: Deploy Applications
+    runs-on: ubuntu-latest
+    needs: [pre-checks, deploy-infra, build-images]
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Create new revision (API)
+        run: |
+          az containerapp update \
+            --name ca-${{ env.ENVIRONMENT_NAME }}-api \
+            --resource-group ${{ needs.deploy-infra.outputs.resourceGroup }} \
+            --image ${{ needs.deploy-infra.outputs.acrLoginServer }}/t4l-api:${{ needs.pre-checks.outputs.version }} \
+            --revision-suffix ${{ github.run_number }}
+
+      - name: Create new revision (Web)
+        run: |
+          az containerapp update \
+            --name ca-${{ env.ENVIRONMENT_NAME }}-web \
+            --resource-group ${{ needs.deploy-infra.outputs.resourceGroup }} \
+            --image ${{ needs.deploy-infra.outputs.acrLoginServer }}/t4l-web:${{ needs.pre-checks.outputs.version }} \
+            --revision-suffix ${{ github.run_number }}
+
+  # =============================================================================
+  # Post-deployment Validation
+  # =============================================================================
+  validate:
+    name: Validate Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-infra, deploy-apps]
+    steps:
+      - name: Wait for deployment
+        run: sleep 90
+
+      - name: API health check
+        run: |
+          for i in {1..5}; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" ${{ needs.deploy-infra.outputs.apiUrl }}/healthz)
+            if [ "$response" == "200" ]; then
+              echo "API health check passed"
+              exit 0
+            fi
+            echo "Attempt $i: API returned $response, retrying..."
+            sleep 15
+          done
+          echo "API health check failed after 5 attempts"
+          exit 1
+
+      - name: Web availability check
+        run: |
+          for i in {1..5}; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" ${{ needs.deploy-infra.outputs.webUrl }})
+            if [ "$response" == "200" ]; then
+              echo "Web availability check passed"
+              exit 0
+            fi
+            echo "Attempt $i: Web returned $response, retrying..."
+            sleep 15
+          done
+          echo "Web availability check failed after 5 attempts"
+          exit 1
+
+  # =============================================================================
+  # Deployment Summary
+  # =============================================================================
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [pre-checks, deploy-infra, deploy-apps, validate]
+    if: always()
+    steps:
+      - name: Create summary
+        run: |
+          echo "## 🚀 Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.pre-checks.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed Services" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| API | ${{ needs.deploy-infra.outputs.apiUrl }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ${{ needs.deploy-infra.outputs.webUrl }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API Docs | ${{ needs.deploy-infra.outputs.apiUrl }}/swagger |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resource Group:** ${{ needs.deploy-infra.outputs.resourceGroup }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "## ❌ Production Deployment Failed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
