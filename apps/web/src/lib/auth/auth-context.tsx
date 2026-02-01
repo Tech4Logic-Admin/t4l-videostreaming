@@ -8,6 +8,7 @@ interface AuthContextType extends AuthState {
   login: (userId?: string, role?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  tryDevMode: () => Promise<boolean>;
   devUsers: DevUser[];
   isDevMode: boolean;
 }
@@ -163,6 +164,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }));
   }, [fetchCurrentUser]);
 
+  // Try to enable dev mode (e.g. when API supports dev-users). Returns true if dev users were loaded.
+  const tryDevMode = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/auth/dev-users`);
+      if (response.ok) {
+        const users = await response.json();
+        if (Array.isArray(users) && users.length > 0) {
+          setDevUsers(users);
+          setIsDevMode(true);
+          return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -170,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         refreshUser,
+        tryDevMode,
         devUsers,
         isDevMode,
       }}

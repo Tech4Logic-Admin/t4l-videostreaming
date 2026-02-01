@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, Upload, LayoutDashboard, User, Menu, Shield, FileVideo, LogOut } from 'lucide-react';
+import { Search, Upload, LayoutDashboard, User, Menu, Shield, FileVideo, LogOut, ChevronDown, Users, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,7 +16,7 @@ import { useAuth } from '@/lib/auth';
 import { usePermissions } from '@/components/auth/protected';
 
 export function Header() {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, tryDevMode, isDevMode } = useAuth();
   const { canUpload, canReview, isAdmin } = usePermissions();
 
   const handleLogout = async () => {
@@ -73,15 +73,40 @@ export function Header() {
             </Link>
           )}
 
-          {/* Dashboard - only for admins */}
+          {/* Admin - dropdown for admins (Dashboard, Videos, Audit) */}
           {isAdmin && (
-            <Link
-              href="/admin/dashboard"
-              className="flex items-center text-sm font-medium text-gray-600 hover:text-t4l-primary transition-colors"
-            >
-              <LayoutDashboard className="mr-1 h-4 w-4" />
-              Dashboard
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center text-sm font-medium text-gray-600 hover:text-t4l-primary transition-colors"
+                >
+                  <Users className="mr-1 h-4 w-4" />
+                  Admin
+                  <ChevronDown className="ml-0.5 h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/dashboard" className="flex items-center">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/videos" className="flex items-center">
+                    <FileVideo className="mr-2 h-4 w-4" />
+                    Videos
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/audit" className="flex items-center">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Audit Logs
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </nav>
 
@@ -139,8 +164,14 @@ export function Header() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
+                      <Link href="/admin/videos" className="flex items-center">
+                        <FileVideo className="mr-2 h-4 w-4" />
+                        Videos
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                       <Link href="/admin/audit" className="flex items-center">
-                        <Shield className="mr-2 h-4 w-4" />
+                        <FileText className="mr-2 h-4 w-4" />
                         Audit Logs
                       </Link>
                     </DropdownMenuItem>
@@ -158,9 +189,26 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : !isLoading ? (
-            <Link href="/login">
-              <Button>Sign In</Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              {!isDevMode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                  onClick={async () => {
+                    const ok = await tryDevMode();
+                    if (ok) {
+                      // Dev mode enabled; DevUserSelector will show; user can pick a dev user
+                    }
+                  }}
+                >
+                  Dev Sign In
+                </Button>
+              )}
+              <Link href="/login">
+                <Button>Sign In</Button>
+              </Link>
+            </div>
           ) : null}
 
           {/* Mobile menu */}
@@ -196,12 +244,26 @@ export function Header() {
                 </DropdownMenuItem>
               )}
               {isAdmin && (
-                <DropdownMenuItem asChild>
-                  <Link href="/admin/dashboard" className="flex items-center">
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
-                  </Link>
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/dashboard" className="flex items-center">
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/videos" className="flex items-center">
+                      <FileVideo className="mr-2 h-4 w-4" />
+                      Videos
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/audit" className="flex items-center">
+                      <FileText className="mr-2 h-4 w-4" />
+                      Audit Logs
+                    </Link>
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
