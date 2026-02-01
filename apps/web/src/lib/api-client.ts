@@ -296,7 +296,7 @@ export class ApiClientError extends Error {
   }
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000');
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
@@ -340,7 +340,21 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
-  const url = new URL(path, API_BASE_URL);
+  let base = API_BASE_URL;
+  // Fallback to current origin if an invalid base sneaks in from env
+  try {
+    // test construct
+    // eslint-disable-next-line no-new
+    new URL(base);
+  } catch {
+    if (typeof window !== 'undefined') {
+      base = window.location.origin;
+    } else {
+      base = 'http://localhost:5000';
+    }
+  }
+
+  const url = new URL(path, base);
 
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
